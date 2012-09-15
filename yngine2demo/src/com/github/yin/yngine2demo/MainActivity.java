@@ -14,7 +14,7 @@ public class MainActivity extends Activity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         yngine = new AndroidYngine();
-        view = new YngineView(getApplication(), null);
+        view = new YngineView(getApplication());
         view.setClient(new TestClient(yngine));
         setContentView(view);
     }
