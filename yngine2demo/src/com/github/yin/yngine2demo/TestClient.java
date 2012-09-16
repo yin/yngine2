@@ -20,27 +20,50 @@ import com.github.yin.yngine2.common.Yngine;
 public class TestClient implements IYngineClient {
 	private OpenGL gl;
 	public static final float vertexData[] = new float[] {
-		-1.0f, -1.0f, 0.0f,
-		1.0f, -1.0f, 0.0f,
-		-1.0f, 1.0f, 0.0f,
-		1.0f, 1.0f, 0.0f,
+
+		-1.0f, -1.0f, -1.0f,
+		 1.0f, -1.0f, -1.0f,
+		-1.0f,  1.0f, -1.0f,
+		 1.0f,  1.0f, -1.0f,
+
+		-1.0f, -1.0f,  1.0f,
+		 1.0f, -1.0f,  1.0f,
+		-1.0f,  1.0f,  1.0f,
+		 1.0f,  1.0f,  1.0f,
 		};
 	public static final float colorData[] = new float[] {
-		0.0f, 0.0f, 1.0f, 1.0f,
+		0.0f, 0.0f, 0.0f, 1.0f,
 		1.0f, 0.0f, 0.0f, 1.0f,
 		0.0f, 1.0f, 0.0f, 1.0f,
 		1.0f, 1.0f, 0.0f, 1.0f,
+
+		0.0f, 0.0f, 1.0f, 1.0f,
+		1.0f, 0.0f, 1.0f, 1.0f,
+		0.0f, 1.0f, 1.0f, 1.0f,
+		1.0f, 1.0f, 1.0f, 1.0f,
 		};
 	public static final short indexData[] = new short[] {
 		0, 1, 2,
 		2, 1, 3,
+		4, 6, 5,
+		5, 6, 7,
+		
+		1, 5, 3,
+		3, 5, 7,
+		4, 0, 6,
+		6, 0, 2,
+		
+		4, 5, 0,
+		0, 5, 1,
+		2, 3, 6,
+		6, 3, 7,
 		};
 	private final String vertexShaderSource = "uniform mat4 uMVPMatrix;\n"
-			+ "attribute vec3 aPosition;\n"
+			+ "attribute vec4 aPosition;\n"
 			+ "attribute vec4 aColor;\n"
 			+ "varying vec4 c;\n"
 			+ "void main() {\n"
-			+ "  gl_Position = uMVPMatrix * vec4(aPosition, 1.0);\n"
+			+ "  gl_Position = uMVPMatrix * aPosition;\n"
 			+ "  c = aColor;"
 			+ "}\n";
 
@@ -120,6 +143,15 @@ public class TestClient implements IYngineClient {
 			throw new RuntimeException(
 					"Could not get attrib location for uMVPMatrix");
 		}
+		try {
+			GLES20.glEnable(GLES20.GL_CULL_FACE);
+			GLES20.glCullFace(GLES20.GL_FRONT);
+//			GLES20.glEnable(GLES20.GL_DEPTH_TEST);
+//			GLES20.glDepthFunc(GLES20.GL_LESS);
+			
+		} catch(Exception ex) {
+			Log.e(TAG, "CullFace", ex);
+		}
 	}
 
 	@Override
@@ -141,8 +173,10 @@ public class TestClient implements IYngineClient {
 		client_camera(time);
 		Matrix.setLookAtM(mVMatrix, 0, ex, ey, ez, tx, ty, tz, ux, uy, uz);
 
-		Matrix.setRotateM(mMMatrix, 0, angle, 0, 0, 1.0f);
-		//Matrix.setIdentityM(mMMatrix, 0);
+		
+		Matrix.setRotateM(mMMatrix, 0, angle, 0, 0, 1);
+		Matrix.rotateM(mMMatrix, 0, angle / (float)Math.PI, 0, 1, 0);
+		Matrix.rotateM(mMMatrix, 0, angle / (float)Math.E, 1, 0, 0);
 		Matrix.multiplyMM(mMVPMatrix, 0, mVMatrix, 0, mMMatrix, 0);
 		Matrix.multiplyMM(mMVPMatrix, 0, mProjMatrix, 0, mMVPMatrix, 0);
 
@@ -153,14 +187,14 @@ public class TestClient implements IYngineClient {
 		checkGlError("glUseProgram");
 
 		vertex.position(VERTEX_DATA_OFFSET);
-		GLES20.glVertexAttribPointer(program_aPositionHandle, vertexData.length / VERTEX_DATA_STRIDE,
+		GLES20.glVertexAttribPointer(program_aPositionHandle, 3,
 				GLES20.GL_FLOAT, false, VERTEX_DATA_STRIDE_BYTES, vertex);
 		checkGlError("glVertexAttribPointer aPosition");
 		GLES20.glEnableVertexAttribArray(program_aPositionHandle);
 		checkGlError("glEnableVertexAttribArray program_aPositionHandle");
 
 		color.position(COLOR_DATA_OFFSET);
-		GLES20.glVertexAttribPointer(program_aColorHandle, colorData.length / COLOR_DATA_STRIDE,
+		GLES20.glVertexAttribPointer(program_aColorHandle, 4,
 				GLES20.GL_FLOAT, false, COLOR_DATA_STRIDE_BYTES, color);
 		checkGlError("glVertexAttribPointer aColor");
 		GLES20.glEnableVertexAttribArray(program_aColorHandle);
@@ -168,7 +202,7 @@ public class TestClient implements IYngineClient {
 
 		GLES20.glUniformMatrix4fv(program_uMVPMatrixHandle, 1, false,
 				mMVPMatrix, 0);
-		GLES20.glDrawElements(GLES20.GL_TRIANGLE_STRIP, indexData.length, GLES20.GL_UNSIGNED_SHORT, index);
+		GLES20.glDrawElements(GLES20.GL_TRIANGLES, indexData.length, GLES20.GL_UNSIGNED_SHORT, index);
 		checkGlError("glDrawArrays");
 		s = time / 1000;
 	}
@@ -176,8 +210,10 @@ public class TestClient implements IYngineClient {
 	private void client_camera(long time) {
 		int a = 0;
 		if (a == 0) {
-			ex =  FloatMath.sin((float)time / 1000);
-			ey =  FloatMath.sin((float)time / 1000);
+			//ex =  FloatMath.sin((float)time / 5000) * (FloatMath.sin((float)time / 2000)) * 5;
+			//ey =  FloatMath.cos((float)time / 5000) * (FloatMath.sin((float)time / 2000)) * 5;
+			ex =  0.0f;
+			ey =  0.0f;
 			ez = -5.0f;
 			tx =  0.0f;
 			ty =  0.0f;
