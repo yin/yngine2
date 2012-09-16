@@ -3,11 +3,13 @@ package com.github.yin.yngine2demo;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
+import java.nio.ShortBuffer;
 import java.util.Random;
 
 import android.opengl.GLES20;
 import android.opengl.Matrix;
 import android.os.SystemClock;
+import android.util.FloatMath;
 import android.util.Log;
 
 import com.github.yin.yingine2.android.render.shaders.IShaderManager;
@@ -18,25 +20,50 @@ import com.github.yin.yngine2.common.Yngine;
 public class TestClient implements IYngineClient {
 	private OpenGL gl;
 	public static final float vertexData[] = new float[] {
-			-1.0f, -1.0f, 0.0f,
-			1.0f, -1.0f, 0.0f,
-			-1.0f, 1.0f, 0.0f,
-			};
+		-1.0f, -1.0f, 0.0f,
+		1.0f, -1.0f, 0.0f,
+		-1.0f, 1.0f, 0.0f,
+		1.0f, 1.0f, 0.0f,
+		};
+	public static final float colorData[] = new float[] {
+		0.0f, 0.0f, 1.0f, 1.0f,
+		1.0f, 0.0f, 0.0f, 1.0f,
+		0.0f, 1.0f, 0.0f, 1.0f,
+		1.0f, 1.0f, 0.0f, 1.0f,
+		};
+	public static final short indexData[] = new short[] {
+		0, 1, 2,
+		2, 1, 3,
+		};
 	private final String vertexShaderSource = "uniform mat4 uMVPMatrix;\n"
-			+ "attribute vec4 aPosition;\n" + "void main() {\n"
-			+ "  gl_Position = uMVPMatrix * aPosition;\n" + "}\n";
+			+ "attribute vec3 aPosition;\n"
+			+ "attribute vec4 aColor;\n"
+			+ "varying vec4 c;\n"
+			+ "void main() {\n"
+			+ "  gl_Position = uMVPMatrix * vec4(aPosition, 1.0);\n"
+			+ "  c = aColor;"
+			+ "}\n";
 
 	private final String fragmentShaderSource = "precision mediump float;\n"
+			+ "varying vec4 c;\n"
 			+ "void main() {\n"
-			+ "  gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);\n" + "}\n";
+			+ "  gl_FragColor = c;\n"
+			+ "}\n";
+	private static final int SHORT_SIZE = 2;
 	private static final int FLOAT_SIZE = 4;
 	private static final String TAG = "yngine";
-	private static final int VERTICEX_DATA_OFFSET = 0;
-	private static final int VERTEX_DATA_STRIDE = 3 * FLOAT_SIZE;
+	private static final int VERTEX_DATA_OFFSET = 0;
+	private static final int VERTEX_DATA_STRIDE = 3;
+	private static final int VERTEX_DATA_STRIDE_BYTES = 3 * FLOAT_SIZE;
+	private static final int COLOR_DATA_OFFSET = 0;
+	private static final int COLOR_DATA_STRIDE = 4;
+	private static final int COLOR_DATA_STRIDE_BYTES = 4 * FLOAT_SIZE;
 	private FloatBuffer vertex;
+	private ShortBuffer index;
 	private int program;
 	private Yngine yngine;
 	private int program_aPositionHandle;
+	private int program_aColorHandle;
 	private int program_uMVPMatrixHandle;
 	private float[] mMMatrix = new float[16];
 	private float[] mVMatrix = new float[16];
@@ -46,13 +73,20 @@ public class TestClient implements IYngineClient {
 	private Random r;
 	private float ex, ey, ez, tx, ty, tz, ux, uy, uz;
 	private long s;
-
+	private FloatBuffer color;
+	
 	public TestClient(Yngine yngine) {
 		this.yngine = yngine;
 		shaders = yngine.getShaderManager();
 		vertex = ByteBuffer.allocateDirect(FLOAT_SIZE * vertexData.length)
 				.order(ByteOrder.nativeOrder()).asFloatBuffer();
-		vertex.put(vertexData);
+		vertex.put(vertexData).position(0);
+		color = ByteBuffer.allocateDirect(FLOAT_SIZE * colorData.length)
+				.order(ByteOrder.nativeOrder()).asFloatBuffer();
+		color.put(colorData).position(0);
+		index = ByteBuffer.allocateDirect(SHORT_SIZE * indexData.length)
+				.order(ByteOrder.nativeOrder()).asShortBuffer();
+		index.put(indexData).position(0);
 	}
 
 	@Override
@@ -69,6 +103,14 @@ public class TestClient implements IYngineClient {
 		if (program_aPositionHandle == -1) {
 			throw new RuntimeException(
 					"Could not get attrib location for aPosition");
+		}
+
+		program_aColorHandle = GLES20.glGetAttribLocation(program,
+				"aColor");
+		checkGlError("glGetAttribLocation aColor");
+		if (program_aColorHandle == -1) {
+			throw new RuntimeException(
+					"Could not get attrib location for aColor");
 		}
 
 		program_uMVPMatrixHandle = GLES20.glGetUniformLocation(program,
@@ -110,23 +152,40 @@ public class TestClient implements IYngineClient {
 		GLES20.glUseProgram(program);
 		checkGlError("glUseProgram");
 
-		vertex.position(VERTICEX_DATA_OFFSET);
-		GLES20.glVertexAttribPointer(program_aPositionHandle, 3,
-				GLES20.GL_FLOAT, false, VERTEX_DATA_STRIDE, vertex);
-		checkGlError("glVertexAttribPointer maPosition");
-
+		vertex.position(VERTEX_DATA_OFFSET);
+		GLES20.glVertexAttribPointer(program_aPositionHandle, vertexData.length / VERTEX_DATA_STRIDE,
+				GLES20.GL_FLOAT, false, VERTEX_DATA_STRIDE_BYTES, vertex);
+		checkGlError("glVertexAttribPointer aPosition");
 		GLES20.glEnableVertexAttribArray(program_aPositionHandle);
 		checkGlError("glEnableVertexAttribArray program_aPositionHandle");
 
+		color.position(COLOR_DATA_OFFSET);
+		GLES20.glVertexAttribPointer(program_aColorHandle, colorData.length / COLOR_DATA_STRIDE,
+				GLES20.GL_FLOAT, false, COLOR_DATA_STRIDE_BYTES, color);
+		checkGlError("glVertexAttribPointer aColor");
+		GLES20.glEnableVertexAttribArray(program_aColorHandle);
+		checkGlError("glEnableVertexAttribArray program_aColorHandle");
+
 		GLES20.glUniformMatrix4fv(program_uMVPMatrixHandle, 1, false,
 				mMVPMatrix, 0);
-		GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 3);
+		GLES20.glDrawElements(GLES20.GL_TRIANGLE_STRIP, indexData.length, GLES20.GL_UNSIGNED_SHORT, index);
 		checkGlError("glDrawArrays");
 		s = time / 1000;
 	}
 
 	private void client_camera(long time) {
-		if (time / 1000 != s) {
+		int a = 0;
+		if (a == 0) {
+			ex =  FloatMath.sin((float)time / 1000);
+			ey =  FloatMath.sin((float)time / 1000);
+			ez = -5.0f;
+			tx =  0.0f;
+			ty =  0.0f;
+			tz =  0.0f;
+			ux =  0.0f;
+			uy =  1.0f;
+			uz =  0.0f;
+		} else if (time / 1000 != s && a == 1) {
 			if (r == null) {
 				r = new Random();
 			}
