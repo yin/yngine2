@@ -8,4 +8,11 @@ public interface IYngineClient {
 	public void dispose();
 	public void onReshape(int width, int height);
 	public void useOGL(OpenGL ogl);
+	public Touch getTouch();
+	
+	public static interface Touch {
+		public void down(int pointer, float x, float y);
+		public void up(int pointer, float x, float y);
+		public void move(int pointer, float x, float y);
+	}
 }
