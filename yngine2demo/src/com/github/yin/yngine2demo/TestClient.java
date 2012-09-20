@@ -20,7 +20,6 @@ import com.github.yin.yngine2.common.Yngine;
 public class TestClient implements IYngineClient {
 	private OpenGL gl;
 	public static final float vertexData[] = new float[] {
-
 		-1.0f, -1.0f, -1.0f,
 		 1.0f, -1.0f, -1.0f,
 		-1.0f,  1.0f, -1.0f,
@@ -146,9 +145,8 @@ public class TestClient implements IYngineClient {
 		try {
 			GLES20.glEnable(GLES20.GL_CULL_FACE);
 			GLES20.glCullFace(GLES20.GL_FRONT);
-//			GLES20.glEnable(GLES20.GL_DEPTH_TEST);
-//			GLES20.glDepthFunc(GLES20.GL_LESS);
-			
+			GLES20.glEnable(GLES20.GL_DEPTH_TEST);
+			GLES20.glDepthFunc(GLES20.GL_LESS);
 		} catch(Exception ex) {
 			Log.e(TAG, "CullFace", ex);
 		}
